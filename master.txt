@@ -1,0 +1,63 @@
+    1  clear
+    2  ssh-keygen
+    3  cd .ssh/
+    4  ls
+    5  sudo vim id_rsa.pub 
+    6  ssh ec2-user@172.31.6.254
+    7  clear
+    8  sudo amazon-linux-extras install ansible2 -y
+    9  ansible --version
+   10  cd /etc/ansible/
+   11  ls
+   12  sudo vim hosts 
+   13  ansible all -m ping
+   14  cd
+   15  cd .ssh/
+   16  sudo vim id_rsa.pub 
+   17  cd
+   18  cd /etc/ansible/
+   19  sudo vim hosts 
+   20  ansible all -m ping
+   21  sudo vim hosts 
+   22  ansible all -m ping
+   23  ssh ec2-user@172.31.7.183
+   24  ansible all -m ping
+   25  cd
+   26  cd .ssh/
+   27  ls
+   28  cat known_hosts 
+   29  cd
+   30  ls
+   31  clear
+   32  cd reporting-db/
+   33  ls
+   34  ansible-playbook mysql-redis.yml 
+   35  sudo vim /etc/ansible/hosts 
+   36  ansible-playbook mysql-redis.yml 
+   37  sudo vim mysql-redis.yml 
+   38  ansible-playbook mysql-redis.yml 
+   39  sudo vim ansible.cfg 
+   40  ansible-playbook mysql-redis.yml 
+   41  sudo vim ansible.cfg 
+   42  ansible-playbook mysql-redis.yml 
+   43  sudo vim mysql-redis.yml 
+   44  ansible-playbook mysql-redis.yml 
+   45  ls
+   46  sudo vim my.cnf 
+   47  ansible-playbook mysql-redis.yml 
+   48  sudo vim mysql-redis.yml 
+   49  ls
+   50  sudo vim vars.yml
+   51  ansible-playbook mysql-redis.yml 
+   52  ls
+   53  rm -rf vars.yml 
+   54  ls
+   55  sudo vim mysql-redis.yml 
+   56  ansible-playbook mysql-redis.yml 
+   57  sudo vim mysql-redis.yml 
+   58  ansible-playbook mysql-redis.yml 
+   59  sudo vim mysql-redis.yml 
+   60  ansible-playbook mysql-redis.yml 
+   61  sudo vim mysql-redis.yml 
+   62  ansible-playbook mysql-redis.yml 
+   63  history > master.txt

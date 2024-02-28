@@ -1,0 +1,14 @@
+[Unit]
+Description=Redis In-Memory Data Store
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=/opt/redis-4.0.10/src/redis-server /etc/redis/redis.conf --daemonize yes
+ExecStop=/opt/redis-4.0.10/src/redis-cli shutdown
+User=ec2-user
+Group=ec2-user
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,263 @@
+- name: Install Redis 4 on Amazon Linux
+  hosts: all
+  become: yes
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+  tasks:
+    - name: Update the package repository
+      dnf:
+        name: '*'
+        state: latest
+
+    - name: Install prerequisites
+      dnf:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - gcc
+        - make
+        - wget
+
+    - name: Download Redis
+      get_url:
+        url: "http://download.redis.io/releases/redis-4.0.10.tar.gz"
+        dest: "/opt/redis-4.0.10.tar.gz"
+
+    - name: Extract Redis
+      unarchive:
+        src: "/opt/redis-4.0.10.tar.gz"
+        dest: "/opt"
+        remote_src: yes
+
+    - name: Navigate to Redis directory
+      shell: cd /opt/redis-4.0.10
+
+    - name: Compile Redis
+      shell: make
+      args:
+        chdir: /opt/redis-4.0.10
+
+    - name: Install Redis binaries
+      shell: make install
+      args:
+        chdir: /opt/redis-4.0.10
+
+
+    - name: Create a configuration directory
+      file:
+        path: /etc/redis
+        state: directory
+          
+    - name: Create Redis configuration file
+      file:
+        path: /opt/redis-4.0.10/redis.conf
+        state: touch
+
+    - name: Copy Redis configuration file
+      copy:
+        src: /opt/redis-4.0.10/redis.conf
+        dest: /etc/redis/redis.conf
+        remote_src: yes
+          
+    - name: Edit the Redis configuration file
+      command: sed -i -e 's/bind 127.0.0.1/bind 0.0.0.0/1' /etc/redis/redis.conf
+    
+    - name: Copy systemd unit file for Redis
+      copy:
+        src: /home/ec2-user/reporting-db/redis.service
+        dest: /etc/systemd/system/redis.service
+
+    - name: Reload systemd to read the new unit file
+      systemd:
+        daemon_reload: yes
+
+    - name: Enable and start Redis service
+      systemd:
+        name: redis
+        state: started
+        enabled: yes 
+  
+
+- name: Setup MySQL, Node Exporter, and Promtail
+  hosts: all
+  become: true
+  vars:
+    passwd_mysql_root: "Pkhacker#123"
+    env: "prod"
+  tasks:
+    - name: create directory if they don't exist
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: ec2-user
+        group: ec2-user
+        mode: 0755
+      loop:
+        - /opt/apps/
+        - /opt/apps/reporting
+        - /opt/apps/reporting/codebase
+  
+    - name: download mysql rpm
+      shell: sudo wget https://dev.mysql.com/get/mysql57-community-release-el7-11.noarch.rpm
+    - name: install mysql rpm
+      shell: sudo yum localinstall mysql57-community-release-el7-11.noarch.rpm -y
+    - name: install new mysql rpm
+      shell: rpm --import https://repo.mysql.com/RPM-GPG-KEY-mysql-2022
+    - name: installing mysql-server
+      dnf:
+        name: mysql-community-server
+    - name: installing the python-selinux
+      dnf:
+        name: libselinux-python3
+
+    - name: Copy shell script
+      copy:
+        src: mysql-volume.sh
+        dest: /opt/mysql-volume.sh
+        owner: ec2-user
+        group: ec2-user
+        mode: 0777
+    - name: Execute the command in remote shell; stdout goes to the specified file on the remote
+      shell: /opt/mysql-volume.sh >> somelog.txt
+      args:
+        chdir: /opt/
+        executable: /bin/bash
+        creates: somelog.txt
+
+    - name: copy my.cnf
+      copy:
+        src: my.cnf
+        dest: /etc/my.cnf
+    - name: start
+      systemd:
+        name: mysqld
+        state: started
+        enabled: yes
+          
+    
+    - name: get temporary password
+      shell: 'grep -oP "temporary password(.*): \K(\S+)" /var/log/mysqld.log'
+      register: mysql_root_password_temp
+    - name: Set new root password from default temporary password
+      shell: "mysql -e \"SET PASSWORD = '{{ passwd_mysql_root }}';\"
+              --connect-expired-password -uroot -p'{{ mysql_root_password_temp.stdout }}'
+              && touch /root/.my.password.changed"
+      args:
+        creates: /root/.my.password.changed
+
+    - name: Download node_exporter
+      get_url:
+        dest: /opt/
+        url: "https://github.com/prometheus/node_exporter/releases/download/v1.0.1/node_exporter-1.0.1.linux-amd64.tar.gz"
+      when: env == "prod"
+
+    - name: Extract tar file
+      unarchive:
+        dest: /opt/
+        src: /opt/node_exporter-1.0.1.linux-amd64.tar.gz
+        remote_src: yes
+      when: env == "prod"
+
+    - name: Move node_exporter to bin
+      copy:
+        dest: /usr/local/bin/
+        mode: ugo+x
+        remote_src: true
+        src: /opt/node_exporter-1.0.1.linux-amd64/node_exporter
+      when: env == "prod"
+  
+    - name: Adding user
+      user:
+        create_home: false
+        name: node_exporter
+        shell: /bin/false
+        system: true
+      when: env == "prod"
+  
+    - name: Creating node_exporter.service
+      file:
+        path: /etc/systemd/system/node_exporter.service
+        state: touch
+      when: env == "prod"
+
+    - name: Adding content to node_exporter.service
+      copy:
+        content: |
+          [Unit]
+          Description=Node Exporter
+          After=network.target
+
+          [Service]
+          User=node_exporter
+          Group=node_exporter
+          Type=simple
+          ExecStart=/usr/local/bin/node_exporter --collector.systemd --no-collector.hwmon
+
+          [Install]
+          WantedBy=multi-user.target
+        dest: /etc/systemd/system/node_exporter.service
+      when: env == "prod"
+
+    - name: Start node_exporter service
+      systemd:
+        name: node_exporter
+        state: started
+        enabled: yes
+      when: env == "prod"
+
+    - name: Download promtail
+      get_url:
+        url: https://github.com/grafana/loki/releases/download/v2.1.0/promtail-linux-amd64.zip
+        dest: /usr/local/bin/
+      when: env == "prod"
+    
+    - name: Extract promtail zip file
+      unarchive:
+        dest: /usr/local/bin/
+        src: /usr/local/bin/promtail-linux-amd64.zip
+        mode: 777
+        remote_src: true
+      when: env == "prod"
+
+    - name: Adding user for promtail
+      user:
+        create_home: false
+        name: promtail
+        shell: /bin/false
+        system: true
+      when: env == "prod"
+
+    - name: Copy promtail configuration file
+      copy:
+        src: promtail-local-config.yaml
+        dest: /usr/local/bin/
+        owner: promtail
+        group: promtail
+        mode: 0755
+      when: env == "prod"
+
+    - name: Creating promtail service file
+      copy:
+        dest: /etc/systemd/system/promtail.service
+        content: |
+          [Unit]
+          Description=Promtail service
+          After=network.target
+
+          [Service]
+          Type=simple
+          Group=promtail
+          User=promtail
+          ExecStart=/usr/local/bin/promtail-linux-amd64 -config.file /usr/local/bin/promtail-local-config.yaml
+
+          [Install]
+          WantedBy=multi-user.target
+      when: env == "prod"
+
+    - name: Start promtail service
+      systemd:
+        name: promtail
+        state: started
+        enabled: yes
+      when: env == "prod"
+
