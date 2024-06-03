@@ -12,7 +12,6 @@ sudo mount /dev/xvdb /var/lib/mysql
 echo "checking mounting status"
 sudo df -h | grep xvdb
 
-
 echo "updating fstab"
 value=`sudo blkid | grep  "xvdb"|  cut -d "\\"" -f 2`
 echo $value
