@@ -64,7 +64,7 @@
     
     - name: Copy systemd unit file for Redis
       copy:
-        src: /home/ec2-user/reporting-db/redis.service
+        src: /home/ec2-user/redis-mysql-ansible/redis.service
         dest: /etc/systemd/system/redis.service
 
     - name: Reload systemd to read the new unit file
