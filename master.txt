@@ -1,4 +1,5 @@
     1  clear
+
     2  ssh-keygen
     3  cd .ssh/
     4  ls
